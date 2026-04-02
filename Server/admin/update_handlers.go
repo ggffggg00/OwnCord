@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/owncord/server/updater"
-	"github.com/owncord/server/util"
 )
 
 // handleCheckUpdate returns the current update status.
@@ -110,7 +109,7 @@ func handleApplyUpdate(u *updater.Updater, hub HubBroadcaster, _ string) http.Ha
 			}
 
 			// Spawn new process.
-			if err := util.SpawnDetached(exePath, os.Args[1:]); err != nil {
+			if err := updater.SpawnDetached(exePath, os.Args[1:]); err != nil {
 				slog.Error("update: spawn new process failed", "error", err)
 				return
 			}
