@@ -561,6 +561,35 @@ func TestGenerateConfig_WritesYAML(t *testing.T) {
 	}
 }
 
+func TestGenerateConfig_UseExternalIPFalse(t *testing.T) {
+	t.Parallel()
+
+	dataDir := t.TempDir()
+	useExt := false
+	cfg := &config.VoiceConfig{
+		LiveKitAPIKey:         "testkey",
+		LiveKitAPISecret:     "testsecret",
+		LiveKitURL:           "ws://localhost:7880",
+		LiveKitUseExternalIP: &useExt,
+	}
+	tlsCfg := &config.TLSConfig{}
+
+	proc := ws.NewLiveKitProcess(cfg, tlsCfg, dataDir)
+
+	cfgPath, err := proc.GenerateConfigForTest()
+	if err != nil {
+		t.Fatalf("generateConfig: %v", err)
+	}
+
+	content, err := os.ReadFile(cfgPath)
+	if err != nil {
+		t.Fatalf("reading config file: %v", err)
+	}
+	if !strings.Contains(string(content), "use_external_ip: false") {
+		t.Fatalf("expected use_external_ip: false in:\n%s", string(content))
+	}
+}
+
 func TestGenerateConfig_WithNodeIP(t *testing.T) {
 	t.Parallel()
 

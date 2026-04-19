@@ -38,8 +38,14 @@ type VoiceConfig struct {
 	LiveKitAPISecret  string `koanf:"livekit_api_secret"` // LiveKit API secret
 	LiveKitURL        string `koanf:"livekit_url"`        // LiveKit server WebSocket URL (e.g. ws://localhost:7880)
 	LiveKitBinaryPath string `koanf:"livekit_binary"`     // path to livekit-server binary; empty = don't auto-start
-	NodeIP            string `koanf:"node_ip"`            // public IP for WebRTC ICE candidates; empty = auto-detect
-	Quality           string `koanf:"quality"`            // low | medium | high
+	// LiveKitRTC UDP port range (inclusive). Must match firewall / Docker published ports.
+	LiveKitRTCPortRangeStart int `koanf:"livekit_rtc_port_range_start"`
+	LiveKitRTCPortRangeEnd   int `koanf:"livekit_rtc_port_range_end"`
+	// LiveKitUseExternalIP controls rtc.use_external_ip in generated livekit.yaml.
+	// nil = default true (WAN discovery); explicit false helps localhost + fixed node_ip.
+	LiveKitUseExternalIP *bool  `koanf:"livekit_use_external_ip"`
+	NodeIP               string `koanf:"node_ip"` // public IP for WebRTC ICE candidates; empty = auto-detect
+	Quality              string `koanf:"quality"` // low | medium | high
 }
 
 // ServerConfig holds HTTP server settings.
@@ -105,10 +111,16 @@ func defaults() Config {
 			MaxSizeMB:  100,
 			StorageDir: "data/uploads",
 		},
-		Voice: VoiceConfig{
-			LiveKitURL: "ws://localhost:7880",
-			Quality:    "medium",
-		},
+		Voice: func() VoiceConfig {
+			useExt := true
+			return VoiceConfig{
+				LiveKitURL:               "ws://localhost:7880",
+				LiveKitRTCPortRangeStart: 50000,
+				LiveKitRTCPortRangeEnd:   60000,
+				LiveKitUseExternalIP:     &useExt,
+				Quality:                  "medium",
+			}
+		}(),
 		GitHub: GitHubConfig{},
 	}
 }
@@ -147,6 +159,9 @@ voice:
   # livekit_api_secret: ""    # LiveKit API secret (REQUIRED, min 32 chars — generate a unique secret)
   livekit_url: "ws://localhost:7880"  # LiveKit server WebSocket URL
   # livekit_binary: ""             # path to livekit-server binary; empty = don't auto-start
+  # livekit_rtc_port_range_start: 50000  # UDP range for WebRTC (must match firewall / Docker)
+  # livekit_rtc_port_range_end: 60000
+  # livekit_use_external_ip: true   # LiveKit rtc.use_external_ip (default true; false with node_ip for local/Docker)
   # node_ip: ""                    # public IP for WebRTC media (required for remote users behind NAT)
   # quality: "medium"              # low | medium | high
 
@@ -278,7 +293,57 @@ func applyVoiceDefaults(v *VoiceConfig) error {
 	if v.Quality == "" {
 		v.Quality = "medium"
 	}
+	if v.LiveKitRTCPortRangeStart == 0 {
+		v.LiveKitRTCPortRangeStart = 50000
+	}
+	if v.LiveKitRTCPortRangeEnd == 0 {
+		v.LiveKitRTCPortRangeEnd = 60000
+	}
+	if v.LiveKitUseExternalIP == nil {
+		t := true
+		v.LiveKitUseExternalIP = &t
+	}
+	if v.LiveKitRTCPortRangeStart >= v.LiveKitRTCPortRangeEnd {
+		return fmt.Errorf("voice.livekit_rtc_port_range_start (%d) must be less than voice.livekit_rtc_port_range_end (%d)",
+			v.LiveKitRTCPortRangeStart, v.LiveKitRTCPortRangeEnd)
+	}
+	if v.LiveKitRTCPortRangeStart < 1024 || v.LiveKitRTCPortRangeEnd > 65535 {
+		return fmt.Errorf("voice LiveKit RTC port range must be within 1024-65535 (got %d-%d)",
+			v.LiveKitRTCPortRangeStart, v.LiveKitRTCPortRangeEnd)
+	}
 	return nil
+}
+
+// EffectiveLiveKitRTCPortRange returns the UDP port range written to livekit.yaml.
+// Call after Load/applyVoiceDefaults; if values are still zero, defaults match applyVoiceDefaults.
+func EffectiveLiveKitRTCPortRange(v *VoiceConfig) (start, end int, err error) {
+	if v == nil {
+		return 0, 0, fmt.Errorf("voice config is nil")
+	}
+	start = v.LiveKitRTCPortRangeStart
+	end = v.LiveKitRTCPortRangeEnd
+	if start == 0 {
+		start = 50000
+	}
+	if end == 0 {
+		end = 60000
+	}
+	if start >= end {
+		return 0, 0, fmt.Errorf("voice.livekit_rtc_port_range_start (%d) must be less than voice.livekit_rtc_port_range_end (%d)", start, end)
+	}
+	if start < 1024 || end > 65535 {
+		return 0, 0, fmt.Errorf("voice LiveKit RTC port range must be within 1024-65535 (got %d-%d)", start, end)
+	}
+	return start, end, nil
+}
+
+// EffectiveLiveKitUseExternalIP returns rtc.use_external_ip for generated livekit.yaml.
+// Default is true when unset (nil); use explicit false with node_ip for loopback/Docker dev.
+func EffectiveLiveKitUseExternalIP(v *VoiceConfig) bool {
+	if v == nil || v.LiveKitUseExternalIP == nil {
+		return true
+	}
+	return *v.LiveKitUseExternalIP
 }
 
 // validateYAML checks that raw bytes are valid YAML.

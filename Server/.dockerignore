@@ -1,0 +1,6 @@
+.git
+.idea
+data
+server
+*.db
+*.log

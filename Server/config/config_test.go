@@ -254,6 +254,39 @@ func TestLoadVoiceConfigDefaults(t *testing.T) {
 	if cfg.Voice.LiveKitAPISecret == config.DefaultLiveKitAPISecret {
 		t.Error("Voice.LiveKitAPISecret should not be the well-known default")
 	}
+	if cfg.Voice.LiveKitRTCPortRangeStart != 50000 {
+		t.Errorf("Voice.LiveKitRTCPortRangeStart = %d, want 50000", cfg.Voice.LiveKitRTCPortRangeStart)
+	}
+	if cfg.Voice.LiveKitRTCPortRangeEnd != 60000 {
+		t.Errorf("Voice.LiveKitRTCPortRangeEnd = %d, want 60000", cfg.Voice.LiveKitRTCPortRangeEnd)
+	}
+	if !config.EffectiveLiveKitUseExternalIP(&cfg.Voice) {
+		t.Error("EffectiveLiveKitUseExternalIP should default true")
+	}
+}
+
+func TestLoadVoiceLiveKitUseExternalIPFalse(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfgPath := filepath.Join(tmpDir, "config.yaml")
+
+	yaml := `
+voice:
+  livekit_api_key: "mykey"
+  livekit_api_secret: "mysecret-thirty-two-chars-minimum-here"
+  livekit_url: "ws://localhost:7880"
+  livekit_use_external_ip: false
+`
+	if err := os.WriteFile(cfgPath, []byte(yaml), 0o644); err != nil {
+		t.Fatalf("failed to write yaml: %v", err)
+	}
+
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load() returned error: %v", err)
+	}
+	if config.EffectiveLiveKitUseExternalIP(&cfg.Voice) {
+		t.Fatal("EffectiveLiveKitUseExternalIP = true, want false from YAML")
+	}
 }
 
 func TestLoadVoiceConfigFromYAML(t *testing.T) {

@@ -1,0 +1,24 @@
+services:
+  owncord-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: owncord-server:latest
+    container_name: owncord-server
+    # network_mode: host
+    ports:
+      - "8443:8443/tcp"
+      - "7880:7880/tcp"
+      - "7881:7881/tcp"
+      # Avoid 50k range — often conflicts with host/ephemeral services (e.g. UDP 50130 in use).
+      - "40000-40100:40000-40100"
+    restart: unless-stopped
+    working_dir: /app
+    command: ["./server"]
+    volumes:
+      - ./config.docker-compose.yaml:/app/config.yaml:ro
+      - ./data:/app/data
+    environment:
+      # Recommended for production: set a stable 32-byte hex key.
+      # Example: OWNCORD_TOTP_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      OWNCORD_TOTP_KEY: ""

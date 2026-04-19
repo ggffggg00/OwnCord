@@ -1,0 +1,36 @@
+# OwnCord config for docker-compose deployment.
+server:
+  port: 8443
+  name: "OwnCord Server (Docker)"
+  data_dir: "data"
+  allowed_origins: ["*"]
+
+database:
+  path: "data/chatserver.db"
+
+tls:
+  mode: "self_signed"
+  cert_file: "data/cert.pem"
+  key_file: "data/key.pem"
+  domain: ""
+  acme_cache_dir: "data/acme_certs"
+
+upload:
+  max_size_mb: 100
+  storage_dir: "data/uploads"
+
+voice:
+  # Change these credentials before production use.
+  livekit_api_key: "docker-livekit-key"
+  livekit_api_secret: "replace-this-with-32-plus-char-secret"
+  livekit_url: "ws://127.0.0.1:7880"
+  livekit_binary: "/usr/local/bin/livekit-server"
+  # Pin SFU ICE host to loopback when you connect via localhost/Tauri on the same machine.
+  # For remote users over the internet, set this to your public IP instead.
+  node_ip: "127.0.0.1"
+  # Let node_ip control ICE; disable WAN auto IP so localhost clients work behind Docker/NAT.
+  livekit_use_external_ip: false
+  # Must match UDP ports published in docker-compose.yml
+  livekit_rtc_port_range_start: 40000
+  livekit_rtc_port_range_end: 40100
+  quality: "medium"

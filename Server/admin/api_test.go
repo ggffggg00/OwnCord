@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -122,6 +123,28 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
 func openAdminTestDB(t *testing.T) *db.DB {
 	t.Helper()
 	database, err := db.Open(":memory:")
+	if err != nil {
+		t.Fatalf("db.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	migrFS := fstest.MapFS{
+		"001_schema.sql": {Data: adminSchema},
+	}
+	if err := db.MigrateFS(database, migrFS); err != nil {
+		t.Fatalf("MigrateFS: %v", err)
+	}
+	return database
+}
+
+// openAdminTestDBFile opens a SQLite database in a temp file with the same
+// admin schema as openAdminTestDB. Use for tests that call VACUUM INTO (e.g.
+// POST /backup): in-memory databases do not support reliable online backup
+// via VACUUM INTO across platforms/drivers.
+func openAdminTestDBFile(t *testing.T) *db.DB {
+	t.Helper()
+	dbPath := filepath.Join(t.TempDir(), "admin_test.db")
+	database, err := db.Open(dbPath)
 	if err != nil {
 		t.Fatalf("db.Open: %v", err)
 	}

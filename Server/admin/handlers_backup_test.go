@@ -39,7 +39,7 @@ func chdirTemp(t *testing.T) string {
 // file and returns 200 with path and created fields.
 func TestHandleBackup_Success(t *testing.T) {
 	tmpDir := chdirTemp(t)
-	database := openAdminTestDB(t)
+	database := openAdminTestDBFile(t)
 	handler := admin.NewAdminAPI(database, "1.0.0", &mockHub{}, nil, nil, nil)
 	token := createAdminUser(t, database)
 
@@ -117,7 +117,7 @@ func TestHandleListBackups_EmptyWhenNoDirExists(t *testing.T) {
 // POST /backup appears in GET /backups.
 func TestHandleListBackups_ReturnsCreatedBackup(t *testing.T) {
 	_ = chdirTemp(t)
-	database := openAdminTestDB(t)
+	database := openAdminTestDBFile(t)
 	handler := admin.NewAdminAPI(database, "1.0.0", &mockHub{}, nil, nil, nil)
 	token := createAdminUser(t, database)
 
